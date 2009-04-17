@@ -5,54 +5,78 @@ import struct
 import time
 from pprint import pprint
 
-f = open(sys.argv[1])
+class TZType:
+    def __init__(self, offset, is_dst, abbr):
+        self.offset, self.is_dst, self.abbr = offset, is_dst, abbr
+    def __repr__(self):
+        return "<TZType %s: UTC%+d dst=%s>" % \
+                (self.abbr, self.offset, self.is_dst)
 
-header_magic, \
-        tzh_ttisgmtcnt, tzh_ttisstdcnt, tzh_leapcnt, tzh_timecnt, \
-        tzh_typecnt, tzh_charcnt = \
-        struct.unpack(">4s16x6l", f.read(44))
+class TZFile:
+    def __init__(self, filename):
+        self.cached_types = None
 
-if header_magic != "TZif": raise "Bad header magic"
+        f = open(sys.argv[1])
 
-for expr in [ "tzh_ttisgmtcnt", "tzh_ttisstdcnt", "tzh_leapcnt", "tzh_timecnt", "tzh_typecnt", "tzh_charcnt" ]:
-    print "% 15s: %s" % (expr, eval(expr))
+        header_magic, \
+                self.ttisgmtcnt, self.ttisstdcnt, self.leapcnt, \
+                self.timecnt, self.typecnt, self.charcnt = \
+                struct.unpack(">4s16x6l", f.read(44))
 
-transitions = zip(
-        struct.unpack(">%dl" % tzh_timecnt, f.read(4 * tzh_timecnt)),
-        struct.unpack(">%dB" % tzh_timecnt, f.read(tzh_timecnt))
-        )
+        if header_magic != "TZif": raise "Bad header magic"
 
-print "Transitions:"
-pprint([ "%s -> type %d" % (time.ctime(x[0]), x[1]) for x in transitions ])
+        self.transitions = zip(
+                struct.unpack(">%dl" % self.timecnt, f.read(4 * self.timecnt)),
+                struct.unpack(">%dB" % self.timecnt, f.read(self.timecnt))
+                )
 
-types = []
+        self.types = []
 
-for i in range(tzh_typecnt):
-    types.append(struct.unpack(">lbB", f.read(4 + 1 + 1)))
+        for i in range(self.typecnt):
+            self.types.append(struct.unpack(">lbB", f.read(4 + 1 + 1)))
 
-print "Types:"
-pprint(types)
+        self.abbreviations = f.read(self.charcnt)
 
-abbreviations = f.read(tzh_charcnt)
+        self.leaps = []
 
-print "Abbreviations:", repr(abbreviations)
+        for i in range(self.leapcnt):
+            self.leaps.append(struct.unpack(">ll", f.read(8)))
 
-leaps = []
+        self.standard_wall_indicators = struct.unpack(">%dB" % self.ttisstdcnt,\
+                f.read(self.ttisstdcnt))
 
-for i in range(tzh_leapcnt):
-    leaps.append(struct.unpack(">ll", f.read(8)))
+        self.utc_local_indicators = struct.unpack(">%dB" % self.ttisgmtcnt, \
+                f.read(self.ttisgmtcnt))
 
-print "Leap seconds:"
-pprint([ "%d seconds at %s" % (x[1], time.ctime(x[0])) for x in leaps ])
+        f.close()
 
-standard_wall_indicators = struct.unpack(">%dB" % tzh_ttisstdcnt, \
-        f.read(tzh_ttisstdcnt))
+    def get_abbr(self, abbrind):
+        """Return the '\\0'-terminated abbreviation at index abbrind within
+        the abbreviations string"""
 
-print "standard/wall indicators:"
-pprint(standard_wall_indicators)
+        return self.abbreviations[abbrind:].split("\x00")[0]
 
-utc_local_indicators = struct.unpack(">%dB" % tzh_ttisgmtcnt, \
-        f.read(tzh_ttisgmtcnt))
+    def get_types(self):
+        if not self.cached_types:
+            self.cached_types = [
+                    TZType(type[0], [False, True][type[1]],
+                        self.get_abbr(type[2]))
+                    for type in self.types ]
+        return self.cached_types
 
-print "utc/local indicators:"
-pprint(utc_local_indicators)
+    def get_transitions(self):
+        return [ ( transition[0], self.get_types()[transition[1]] )
+                 for transition in self.transitions ]
+
+    def formatted_transitions(self):
+        return [ "At %s, switch to %s" %
+                (time.ctime(transition[0]), transition[1].abbr)
+                for transition in self.get_transitions() ]
+
+if __name__ == '__main__':
+        my_tzfile = TZFile(sys.argv[1])
+
+        print "Transitions:"
+        pprint(my_tzfile.formatted_transitions())
+        print "Types:"
+        pprint(my_tzfile.get_types())
