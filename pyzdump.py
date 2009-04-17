@@ -1,11 +1,24 @@
 #!/usr/bin/python
 
+"""Dump zoneinfo files
+
+This was written based on the tzfile.5 manpage, from man-pages 3.01.
+"""
+
+__author__ = 'Ohad Lutzky <ohad@lutzky.net>'
+
 import sys
 import struct
 import time
 from pprint import pprint
 
 class TZType:
+    """This class represents a timezone type.
+
+    * offset: Offset in seconds from GMT
+    * is_dst: Is this a DST time?
+    * abbr: Abbreviation"""
+
     def __init__(self, offset, is_dst, abbr):
         self.offset, self.is_dst, self.abbr = offset, is_dst, abbr
     def __repr__(self):
@@ -57,6 +70,9 @@ class TZFile:
         return self.abbreviations[abbrind:].split("\x00")[0]
 
     def get_types(self):
+        """tz.get_types() -> list of TZTypes
+
+        Get the local timezone types as a TZType list"""
         if not self.cached_types:
             self.cached_types = [
                     TZType(type[0], [False, True][type[1]],
@@ -65,10 +81,22 @@ class TZFile:
         return self.cached_types
 
     def get_transitions(self):
+        """tz.get_transitions() -> (timestamp, TZType) list
+
+        Get the list of timezone transitions."""
+
+        # TODO: timestamp may be relative to UTC, local standard, or local wall
+        # time. It's UTC in modern systems, but the POSIX standard
+        # should support all three. Use standard_wall_indicators and
+        # utc_local_indicators.
         return [ ( transition[0], self.get_types()[transition[1]] )
                  for transition in self.transitions ]
 
     def formatted_transitions(self):
+        """tz.formatted_transitions() -> string list
+
+        Get a human-readable list of timezone transitions"""
+
         return [ "At %s, switch to %s" %
                 (time.ctime(transition[0]), transition[1].abbr)
                 for transition in self.get_transitions() ]
