@@ -1,0 +1,2 @@
+# Zone    NAME                GMTOFF  RULES/SAVE  FORMAT  [UNTIL]
+Zone      IsraelIDT           2:00    01:00       IDT

@@ -1,0 +1,8 @@
+# Rule  NAME    FROM  TO    TYPE  IN   ON       AT    SAVE  LETTER/S
+Rule    ZionIDT min   1939  -     Jan  1        00:00 1:00  D
+Rule    ZionIDT 1939  only  -     Jan  1        00:00 0:00  S
+Rule    ZionIDT 1940  max   -     Jan  1        00:00 1:00  D
+#Rule    ZionIDT max only -     Jan  1        00:00 0:00  S
+
+# Zone    NAME                GMTOFF  RULES/SAVE  FORMAT  [UNTIL]
+Zone      IsraelIDT           2:00    ZionIDT     I%sT
